@@ -1,6 +1,9 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
 
+using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Running;
+
 namespace HighOrderedFunctions;
 
 [Serializable]
@@ -17,24 +20,124 @@ public sealed class FilterMovieException : Exception
     public FilterMovieException(string message, Exception inner) : base(message, inner)
     {
     }
-}   
-
-public static class Program
+}
+public sealed class AnotherFilterMovieException : Exception
 {
-    public static void Main(string[] argc )
+    public AnotherFilterMovieException()
+    {
+    }
+
+    public AnotherFilterMovieException(string message) : base(message)
+    {
+    }
+
+    public AnotherFilterMovieException(string message, Exception inner) : base(message, inner)
+    {
+    }
+}
+
+[MemoryDiagnoser]
+public class Program
+{
+    public static void Main()
     {
 
-        var reqYear = 1997;
-        Func<IEnumerable<Movie>, Exception> abc = movies =>
-        {
-            return !movies.Any()
-                ? new FilterMovieException($"List of movies neobsahuje zadny zaznam pro rok {reqYear}")
-                : new FilterMovieException($"List of movies obsahuje duplicity pro rok {reqYear}");
-        };
-        
-        var reqMovie = GetAllMovies().SingleElseException(movie => movie.Year == reqYear, abc);
+        // BenchmarkRunner.Run<Program>();
 
-        Console.WriteLine($"{reqMovie.Name}");
+        var program = new Program();
+
+        program.UsingClassMethod();
+
+        // Using lambda
+        program.UsingLambda();
+
+        program.UsingLocalFunc();
+        
+
+    }
+
+    [Benchmark]
+    public void UsingClassMethod()
+    {
+        var reqYear = 1997;
+        Movie? reqMovie;
+
+        // Using local method
+        try
+        {
+            reqMovie = GetAllMovies().SingleElseException(movie => movie.Year == reqYear, movies => FunctionCall(movies, reqYear));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+    }
+
+    [Benchmark]
+    public void UsingLambda()
+    {
+        var reqYear = 1997;
+        Movie? reqMovie;
+
+        // Using local method
+        try
+        {
+            reqMovie = GetAllMovies().SingleElseException(movie => movie.Year == reqYear, movies =>
+            {
+                if (!movies.Any())
+                {
+                    return new FilterMovieException($"List of movies neobsahuje zadny zaznam pro rok {reqYear}");
+                }
+                else
+                {
+                    return new FilterMovieException($"List of movies obsahuje duplicity pro rok {reqYear}");
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+    }
+
+    [Benchmark]
+    public void UsingLocalFunc()
+    {
+        var reqYear = 1997;
+
+        try
+        {
+            var reqMovie = GetAllMovies().SingleElseException(movie => movie.Year == reqYear, LocalFunc);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+
+        // Declaration of local function !!!
+        Exception LocalFunc(IEnumerable<Movie> movies)
+        {
+            if (!movies.Any())
+            {
+                return new AnotherFilterMovieException($"List of movies neobsahuje zadny zaznam pro rok {reqYear}");
+            }
+            else
+            {
+                return new AnotherFilterMovieException($"List of movies obsahuje duplicity pro rok {reqYear}");
+            }
+        }
+    }
+
+    private static Exception FunctionCall(IEnumerable<Movie> movies, int reqYear)
+    {
+        if (!movies.Any())
+        {
+            return new FilterMovieException($"List of movies neobsahuje zadny zaznam pro rok {reqYear}");
+        }
+        else
+        {
+            return new FilterMovieException($"List of movies obsahuje duplicity pro rok {reqYear}");
+        }
     }
 
     private static IEnumerable<Movie> GetAllMovies()
